@@ -15,8 +15,10 @@ You need python 3.8 and the following libraries (commands to install assume a co
 
 
 ## Execution
+### Getting the formulas
+Formulas used in all experiments are at: https://gofile.io/d/pGB1lN (anonymous link & files). See the Readme.md there for additional details.
 
-- Replicating Section 4 experiments:
+### Replicating Section 4 experiments
  `python mlbf/main.py *.cnf --output=out.csv`
 
 This will generate a dataset, run 5-fold cross validation of a 2-hidden layer MLP (200 and 100 neurons, respectively) for each `.cnf` file, writing the statistics on `out.csv`. If the dataset was already generated, it will be used. Run `python mlbf/main.py -- --help` for additional options.
@@ -24,7 +26,7 @@ The resulting `.csv` contains a formula per line, with the associated statistics
 See the companion `data` folder for the instances.
  
 
-- Replicating Section 5 experiments:
+### Replicating Section 5 experiments
 `python mlbf/mlpsize.py mlpsize *.cnf --output=out.csv`
 
 This will generate a dataset and test how many neurons in a single-hidden-layer MLP are required for perfect accuracy on 5-fold CV  for each `.cnf` file, writing the statistics on `out.csv`. 

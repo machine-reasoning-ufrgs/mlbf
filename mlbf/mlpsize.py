@@ -148,6 +148,3 @@ def vsphase(basedir, activation, var_sizes=range(10, 101, 10)):
 
 if __name__ == '__main__':
     fire.Fire()
-
-#  srun --resv-ports --nodes 1 --ntasks=1 -c 16 python mlbf/mlpsize.py vsphase $SCRATCH/mlbf/instances/phase relu [x]
-#  for d in instances/phase/v*/*/; do echo $d; srun --resv-ports  --nodes 1 --ntasks=1 -c 16 python mlbf/mlpsize.py vsphase instances/phase relu [x]

@@ -168,6 +168,3 @@ def cli_generate_dataset(*cnf, solver='unigen', num_positives=500, num_negatives
 if __name__ == '__main__':
     fire.Fire(cli_generate_dataset)
 
-
-#  generate dataset for phase transition:
-#  for d in instances/phase/v*/*/; do echo $d; srun --resv-ports  --nodes 1 --ntasks=1 -c 16 python mlbf/dataset.py $d/*.cnf; done

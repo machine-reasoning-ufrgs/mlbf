@@ -33,5 +33,6 @@ The resulting `.csv` contains a formula per attempted number of neurons (from 1 
 Formulas whose lines stop before 512 neurons have been learned with less and not tested further. 
 See the companion `data` folder for the instances.
 
-
+Note: you might want to run `python mlbf/sample_small.py *.cnf` to make sure that all formulas have the companion dataset 
+(the script will generate the dataset for those formulas that Unigen2 missed).
 

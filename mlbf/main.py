@@ -16,12 +16,12 @@ import numpy as np
 def main(cnf, solver='unigen', output='out.csv', cvfolds=5, model='MLP',
          mlp_layers=[200,100], mlp_activation='relu', save_dataset=True):
     """
-    Runs the prototype, executing the following steps:
+    Executes the following steps:
 
     Receives a boolean formula specified in CNF format,
     Generates many sat and unsat samples for the formula,
-    Trains a classifier on this dataset,
-    Writes performance metrics to the standard output
+    Runs k-fold CV of a classifier on the dataset, writing
+    the performance on the specified file.
 
     :param cnf: path to the boolean formula in CNF (Dimacs) format (see https://people.sc.fsu.edu/~jburkardt/data/cnf/cnf.html)
     :param solver: name of the SAT solver to find the satisfying samples

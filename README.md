@@ -35,4 +35,5 @@ See the companion `data` folder for the instances.
 
 Note: you might want to run `python mlbf/sample_small.py *.cnf` to make sure that all formulas have the companion dataset 
 (the script will generate the dataset for those formulas that Unigen2 missed).
+You can also modify the script to do the same for the formulas of Section 4 experiments.
 

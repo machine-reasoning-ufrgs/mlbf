@@ -2,10 +2,13 @@ import os
 import random
 
 import glob
+from math import log, log10
+
 import fire
 import random
 import numpy as np
 import pandas as pd
+from pysat.formula import CNF
 
 from positives import PySATSampler, UnigenSampler
 import negatives as negative_sampler
@@ -150,18 +153,27 @@ def generate_dataset(cnf, solver='unigen', num_positives=500, num_negatives=500,
     return data_x, data_y
 
 
-def cli_generate_dataset(*cnf, solver='unigen', num_positives=500, num_negatives=500, save_dataset=True, overwrite=False):
+def cli_generate_dataset(*cnf, solver='unigen', num_positives=0, num_negatives=0,
+                         save_dataset=True, overwrite=False, proportion=None):
     """
     This function just calls 'generate_dataset' but does not return data for cleaner use with fire.Fire
-     :param cnf: path to the boolean formula in DIMACS CNF format
+    :param cnf: path to the boolean formula in DIMACS CNF format
     :param solver: unigen or the name of a PySAT solver
     :param num_positives: number of positive samples
     :param num_negatives: number of negative samples
     :param save_dataset: if True, saves the dataset as cnf_solver_pos_neg.pkl.gz, where pos & neg are the actual number of samples
     :param overwrite: if True, overwrites an existing datset
+    :param proportion: fraction of 2^#vars that will correspond to the dataset size
+    (can use string 'quadratic' or 'loglike' for vars^2 or min(2^n,5000*2^(log(n/10)-1)), respectively
     :return:
     """
     for formula in cnf:
+        if proportion == 'quadratic':  # dataset size will be vars^2
+            f = CNF(cnf)
+            num_positives = num_negatives = int((f.nv**2) / 2)
+        elif proportion == 'loglike':   # dataset size grows log-scale with the number of possible assignments
+            f = CNF(cnf)
+            num_positives = num_negatives = int(min(2**f.nv,  5000*2**(log10(f.nv)-1)))
         generate_dataset(formula, solver, num_positives, num_negatives, save_dataset, overwrite)
 
 

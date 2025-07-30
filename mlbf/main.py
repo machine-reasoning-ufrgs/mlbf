@@ -6,15 +6,15 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.model_selection import StratifiedKFold, cross_validate
-from sklearn.metrics import accuracy_score, precision_score
+from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_split
+from sklearn.metrics import accuracy_score, precision_score, f1_score
 
 import dataset
 import numpy as np
 
 
-def main(cnf, solver='unigen', output='out.csv', cvfolds=5, model='MLP',
-         mlp_layers=[200,100], mlp_activation='relu', save_dataset=True):
+def evaluate(cnf, solver='unigen', output='out.csv', cvfolds=5, model='MLP',
+             mlp_layers=[200, 100], mlp_activation='relu', save_dataset=True):
     """
     Runs the prototype, executing the following steps:
 
@@ -33,6 +33,9 @@ def main(cnf, solver='unigen', output='out.csv', cvfolds=5, model='MLP',
     :param save_dataset: if True, saves the dataset as 'input.cnf.pkl.gz'
     :return:
     """
+
+    print(f'Working on file {os.path.basename(cnf)} with process {os.getpid()}.')
+
     start = datetime.datetime.now()
 
     data_x, data_y = dataset.get_dataset(cnf, solver)
@@ -42,36 +45,57 @@ def main(cnf, solver='unigen', output='out.csv', cvfolds=5, model='MLP',
         return
 
     # change class_weight to accomodate for imbalanced dataset+
-    learner = DecisionTreeClassifier(criterion='entropy',)
+    learner = DecisionTreeClassifier(criterion='entropy', )
     if model == 'MLP':
         learner = MLPClassifier(hidden_layer_sizes=mlp_layers, activation=mlp_activation)
     if model == 'RF':
         learner = RandomForestClassifier()
 
-    write_header(output)
-
-    scoring = ['accuracy', 'f1_macro']
-    scores = cross_validate(learner, data_x, data_y, cv=cvfolds, scoring=scoring)
+    write_header(output, cvfolds > 1)
 
     with open(output, 'a') as outstream:
         # gathers accuracy and precision by running the model and writes it to output
         # print(scores)
-        acc, f1 = np.mean(scores['test_accuracy']), np.mean(scores['test_f1_macro']) #run_model(learner, data_x, data_y, splitter)
-        std_acc, std_f1 = np.std(scores['test_accuracy']), np.std(scores['test_f1_macro'])
-        finish = datetime.datetime.now()
+
         model_str = model if model != 'MLP' else f'{model}_{mlp_activation}_{"-".join([str(x) for x in mlp_layers])}'
-        outstream.write(f'{os.path.basename(cnf)},{solver},{model_str},{cvfolds},{acc},{std_acc},{f1},{std_f1},{start},{finish}\n')
+
+        if cvfolds == 1:
+            X_train, X_test, y_train, y_test = train_test_split(
+                data_x, data_y, test_size=0.25, stratify=data_y, shuffle=True,
+                random_state=202205)
+
+            model_fit = learner.fit(X_train, y_train)
+            acc, f1 = accuracy_score(y_test, model_fit.predict(X_test)), f1_score(y_test, model_fit.predict(X_test))
+
+            finish = datetime.datetime.now()
+            outstream.write(
+                f'{os.path.basename(cnf)},{solver},{model_str},{acc},{f1},{start},{finish}\n')
+        else:
+            scoring = ['accuracy', 'f1_macro']
+            scores = cross_validate(learner, data_x, data_y, cv=cvfolds, scoring=scoring)
+
+            acc, f1 = np.mean(scores['test_accuracy']), np.mean(
+                scores['test_f1_macro'])  # run_model(learner, data_x, data_y, splitter)
+            std_acc, std_f1 = np.std(scores['test_accuracy']), np.std(scores['test_f1_macro'])
+            finish = datetime.datetime.now()
+
+            outstream.write(
+                f'{os.path.basename(cnf)},{solver},{model_str},{cvfolds},{acc},{std_acc},{f1},{std_f1},{start},{finish}\n')
 
 
-def write_header(output):
+def write_header(output, k_fold=False):
     """
     Creates the header in the output file if it does not exist
     :param output: path to the output file
+    :param k_fold: header for split data or k-fold cv
     :return:
     """
     if output is not None and not os.path.exists(output):
         with open(output, 'w') as out:
-            out.write('dataset,sampler,learner,cvfolds,mean_acc,std_acc,mean_f1_macro,std_f1,start,finish\n')
+            if k_fold:
+                out.write('dataset,sampler,learner,cvfolds,mean_acc,std_acc,mean_f1_macro,std_f1,start,finish\n')
+            else:
+                out.write('dataset,sampler,learner,mean_acc,mean_f1_macro,start,finish\n')
 
 
 def run_model(model, data_x, data_y, splitter):
@@ -118,5 +142,5 @@ def run_model(model, data_x, data_y, splitter):
 
 
 if __name__ == '__main__':
-    fire.Fire(main)
+    fire.Fire(evaluate)
     print("Done")

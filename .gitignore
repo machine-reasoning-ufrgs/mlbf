@@ -128,3 +128,14 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /.idea/
+/**/*.out
+
+# SAT instances
+/instances/*.csv
+/instances/satlibmis/
+/instances/SAT_MS*.cnf
+/instances/**/*.cnf
+/instances/**/*.pkl.gz
+
+# Datasets
+/data

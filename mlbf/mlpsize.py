@@ -46,8 +46,8 @@ def mlpsize(*inputs, solver='unigen', output='out.csv', cvfolds=5,
 
         data_x, data_y = dataset.get_dataset(formula, solver)
 
-        if len(data_x) < 100:
-            print(f'{inputs} has {len(data_x)} instances, which is less than 100 (too few to learn). Aborting.')
+        if len(data_x) < 50:
+            print(f'{formula} has {len(data_x)} instances, which is less than 50 (too few to learn). Aborting.')
             continue  # goes to the next input
 
         # goes from 1, 2, 4, ..., max_neurons until it finds the optimal accuracy

@@ -17,6 +17,10 @@ Then you just need to clone this repository:
 
 `git clone https://github.com/andertavares/mlbf.git` and enter the new directory `mlsat` to be able to execute.
 
+If you want to generate new formulas with the `mlbf/kcnfgen.py` script, you also need to install `cnfgen`and `minisat`.
+* For CNFgen, see https://massimolauria.net/cnfgen/ for installation instructions.
+* For minisat, a install with `sudo apt-get install minisat` works on Ubuntu (please adapt to your distro).
+
 ## Execution
 
 - Replicating Section 4 experiments:

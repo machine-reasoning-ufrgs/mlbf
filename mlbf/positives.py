@@ -1,10 +1,8 @@
 import os
-import random
-import sys
 from abc import ABC
 
 from pysat.formula import CNF
-from pysat.solvers import Solver, NoSuchSolverError
+from pysat.solvers import NoSuchSolverError, Solver
 
 
 class PositiveSampler(ABC):
@@ -12,6 +10,7 @@ class PositiveSampler(ABC):
     An abstract base class to provide a uniform interface for generating
      positive samples from a boolean formula
     """
+
     def sample(self, cnf_file, max_samples=1000):
         raise NotImplementedError
 
@@ -52,8 +51,8 @@ class PySATSampler(PositiveSampler):
                 sat_list = []
                 for i, solution in enumerate(solver.enum_models()):
                     sat_list.append(solution)
-                    if i+1 >= max_samples / 2:  # adds 1 to index as it starts at zero
-                        print(f"Limit number of {max_samples/2} positive samples reached.")
+                    if i + 1 >= max_samples:  # adds 1 to index as it starts at zero
+                        print(f"Limit number of {max_samples} positive samples reached.")
                         break
 
                 print(f'Found {len(sat_list)} sat instances.')
@@ -129,7 +128,7 @@ class UnigenSampler(PositiveSampler):
                 if len(str_assignments) > 0:
                     sample = [int(x) for x in str_assignments]
                     # fragment below commented out because unigen was changed to return assignment for all vars
-                    #if len(sample) < self.formula.nv: # only indep. support has been assigned
+                    # if len(sample) < self.formula.nv: # only indep. support has been assigned
                     #    sample = self.fill_dependent_variables(sample)
 
                     samples.append(sample)
@@ -163,6 +162,143 @@ class UnigenSampler(PositiveSampler):
         # calls unigen on the formula from cnf_file
         ret_code = subprocess.call(  # using a 10m (600 seconds) timeout
             f'python UniGen2.py -samples={max_samples} -runIndex=0 -timeout=600 -satTimeout=300 '
+            f'{cnf_abspath} {out_dir}'.split(' ')  # split because call accepts an array
+        )
+        if ret_code != 0:
+            print("WARNING! there has been some error with unigen's execution. "
+                  "Please check the output above.")
+        os.chdir(current_dir)
+
+    def fill_dependent_variables(self, sample):
+        """
+        Fills the dependent variables of an incomplete sample
+        :param sample:
+        :return:
+        """
+        # known support: dict(variable -> value) --- value > 0 == True
+        known_support = {abs(literal): literal for literal in sample}
+
+        # puts clauses in set of tuples to ease removal
+        clauses = set([tuple(c) for c in self.formula.clauses])
+
+        while len(known_support) < self.formula.nv:
+            # all clauses must evaluate to true
+            for clause in clauses:
+                # if all variables are in the known support, remove the clause & go to next
+                if all([abs(l) in known_support for l in clause]):
+                    clauses.remove(clause)
+                    continue
+
+                # if known variables already make the clause true, ignore & go to next
+                clause_solved = False
+                missing_literals = []
+                for l in clause:
+                    if l not in known_support:
+                        missing_literals.append(l)
+                    elif known_support[l] * l > 0:  # if variable value & literal agree on sign, it evaluates to True
+                        clause_solved = True
+
+                # if clause is not solved and only 1 literal is missing, determine its value
+                if not clause_solved and len(missing_literals) == 1:
+                    # the corresponding value of the variable is the literal itself
+                    known_support[abs(missing_literals[0])] = missing_literals[0]
+
+            # returns the full assignment with variables sorted according to their index (abs. value)
+            return sorted(known_support.values(), key=lambda x: abs(x))
+
+
+class Unigen3Sampler(PositiveSampler):
+    def __init__(self, tmp_dir='/tmp/unigen3'):
+        """
+        Initializes the Unigen3Sampler
+        :param tmp_dir: working dir of the sample generator unigen3
+        """
+        self.tmp_dir = tmp_dir
+        self.formula = None  # is assigned in generated_dataset
+
+    def sample(self, cnf_file, max_samples=1000):
+        """
+         Uses Unigen3 (https://github.com/meelgroup/unigen) to generate a dataset
+         :param cnf_file:
+         :param max_samples:
+         :return:
+         """
+        # makes sure that unigen working dir exists for positive and negative samples
+        pos_dir = os.path.join(self.tmp_dir, 'positives')
+        neg_dir = os.path.join(self.tmp_dir, 'negatives')
+        os.makedirs(pos_dir, exist_ok=True)
+        os.makedirs(neg_dir, exist_ok=True)
+
+        # gets f from the cnf file
+        f = CNF(cnf_file)
+        self.formula = f
+
+        print("Generating positive instances.")
+        self.run_unigen(cnf_file, pos_dir, max_samples)
+        # the file with the positive samples is pos_dir/cnf_file_0.txt
+        cnf_name = os.path.splitext(os.path.basename(cnf_file))[0]
+        positives = self.retrieve_samples(os.path.join(pos_dir, f'{cnf_name}_0.txt'))
+        print(f'Sampled {len(positives)} unique positive instances')
+
+        return positives  # prepare_dataset(positives, negatives, ds_path)
+
+    def retrieve_samples(self, samples_path):
+        """
+        Reads the file generated by unigen to extract the satisfying assignments there
+        :param samples_path:
+        :return:
+        """
+        if not os.path.exists(samples_path):
+            print(f'Samples file {samples_path} does not exist. Returning empty.')
+            return []
+
+        print(f'Recovering samples from {samples_path}')
+        samples = []
+        with open(samples_path) as sample_file:
+            for line in sample_file.readlines():
+                # format of each line: v1 2 ... N 0:M, where 1 2 ... N are the variables (asserted or negated)
+                # strips, discards the first char (v), splits with space, discards the last part (0:M)
+                # str_assignments is an array with the variables (asserted or negated)
+                str_assignments = line.strip().split(' ')[:-1]
+                # appends this assignment to the list of positive (witnesses for f)
+                # the if skips blank lines
+                if len(str_assignments) > 0:
+                    sample = [int(x) for x in str_assignments]
+                    # fragment below commented out because unigen was changed to return assignment for all vars
+                    # if len(sample) < self.formula.nv: # only indep. support has been assigned
+                    #    sample = self.fill_dependent_variables(sample)
+
+                    samples.append(sample)
+        return samples
+
+    def run_unigen(self, cnf_file, out_dir, max_samples):
+        """
+        Calls unigen script to generate SAT witnesses for the formula in cnf_file
+        The witnesses will be located at out_dir
+        :param cnf_file:
+        :param out_dir:
+        :param max_samples:
+        :return:
+        """
+        import subprocess
+
+        print('Calling unigen3.')
+        # saves the current dir, the input name (filename w/o extension) and
+        # absolute path to the input
+        current_dir = os.getcwd()
+        cnf_abspath = os.path.abspath(cnf_file)
+
+        '''
+        unigen is called with: python UniGen2.py [options] cnf_file output
+        We'll call python from the command line as it is not straightforward to 
+        import unigen and instantiate its parameters directly
+        '''
+        unigen_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'unigen3')
+        os.chdir(unigen_dir)
+
+        # calls unigen on the formula from cnf_file
+        ret_code = subprocess.call(  # using a 10m (600 seconds) timeout
+            f'python UniGen3.py -samples={max_samples} -runIndex=0 -onlyIndependent=0 ' \
             f'{cnf_abspath} {out_dir}'.split(' ')  # split because call accepts an array
         )
         if ret_code != 0:

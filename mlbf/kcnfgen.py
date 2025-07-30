@@ -4,6 +4,11 @@ import subprocess
 
 import fire
 
+"""
+This module requires cnfgen and minisat installed and available in your command line path. 
+For CNFgen, see https://massimolauria.net/cnfgen/ for installation instructions.
+For minisat, a install with 'sudo apt-get install minisat' works (please adapt to your distro).
+"""
 
 def phase_transition_clauses(num_vars):
     """
@@ -46,7 +51,7 @@ def kcnfgen(output, n, m, k=3):
     subprocess.call(['cnfgen', '--output', output, 'randkcnf', str(k), str(n), str(m)])
 
 
-def generate_instances(dest_dir, n, m, k=3, num_instances=100, tmpfile='/tmp/candidate.cnf'):
+def generate_instances(dest_dir, n, m, k=3, num_instances=100, initial_offset=0, accept_unsat=False, tmpfile='/tmp/candidate.cnf'):
     """
     Generates k-CNF instances according to the specified parameters.
     Calls minisat to check the satisfiability status, then names the file accordingly.
@@ -55,10 +60,12 @@ def generate_instances(dest_dir, n, m, k=3, num_instances=100, tmpfile='/tmp/can
     :param m: number of clauses
     :param k: variables per clause
     :param num_instances: number of formulas to generate
+    :param initial_offset: start saving instances at which number?
+    :param accept_unsat: save unsat instances as well?
     :param tmpfile: temporary file name where the instance is tested for satisfiability
     """
     num_sat, num_unsat = 0, 0
-    for i in range(num_instances):
+    while num_sat + num_unsat < num_instances:
         print(f'calling cnfgen with n={n}, m={m}, k={k}')
         kcnfgen(tmpfile, n, m, k)
 
@@ -70,11 +77,12 @@ def generate_instances(dest_dir, n, m, k=3, num_instances=100, tmpfile='/tmp/can
         except subprocess.CalledProcessError as ex:
             if ex.returncode == 10:  # satisfiable
                 num_sat += 1
-                shutil.move(tmpfile, f'{dest_dir}/sat_{num_sat:05}_k{k}_v{n}_c{m}.cnf')
+                shutil.move(tmpfile, f'{dest_dir}/sat_{num_sat+initial_offset:05}_k{k}_v{n}_c{m}.cnf')
 
             elif ex.returncode == 20:  # unsatisfiable
-                num_unsat += 1
-                shutil.move(tmpfile, f'{dest_dir}/unsat_{num_unsat:05}_k{k}_v{n}_c{m}.cnf')
+                if accept_unsat:
+                    num_unsat += 1
+                    shutil.move(tmpfile, f'{dest_dir}/unsat_{num_unsat+initial_offset:05}_k{k}_v{n}_c{m}.cnf')
 
             else:
                 raise RuntimeError(f"Unexpected minisat return code '{ex.returncode}' on {tmpfile}")
